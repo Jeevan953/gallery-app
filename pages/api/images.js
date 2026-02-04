@@ -1,0 +1,116 @@
+import { v2 as cloudinary } from 'cloudinary';
+
+const cache = new Map();
+const CACHE_DURATION = 30000;
+
+export default async function handler(req, res) {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Cache-Control', 'public, max-age=60');
+  
+  if (req.method === 'GET') {
+    const { folder = 'gallery' } = req.query;
+    const cacheKey = `images:${folder}`;
+
+    try {
+      // Check cache first
+      if (cache.has(cacheKey)) {
+        const cached = cache.get(cacheKey);
+        if (Date.now() - cached.timestamp < CACHE_DURATION) {
+          console.log('Serving from cache:', folder);
+          return res.status(200).json(cached.data);
+        }
+      }
+
+      // Get credentials
+      const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
+      const apiKey = process.env.NEXT_PUBLIC_CLOUDINARY_API_KEY;
+      const apiSecret = process.env.CLOUDINARY_API_SECRET;
+
+      // Check if credentials are actually set
+      const hasRealCredentials = cloudName && apiKey && apiSecret && 
+                                !cloudName.includes('your_cloud_name') && 
+                                !cloudName.includes('demo');
+
+      if (!hasRealCredentials) {
+        console.log('Using mock data - Cloudinary not properly configured');
+        const mockImages = getMockImages(folder);
+        cache.set(cacheKey, { data: mockImages, timestamp: Date.now() });
+        return res.status(200).json(mockImages);
+      }
+
+      // Configure Cloudinary
+      cloudinary.config({
+        cloud_name: cloudName,
+        api_key: apiKey,
+        api_secret: apiSecret,
+        secure: true,
+        timeout: 3000
+      });
+
+      console.log('Fetching from Cloudinary for folder:', folder);
+
+      let result;
+      try {
+        // FIXED: Use the folder parameter directly without adding extra 'gallery/'
+        result = await cloudinary.api.resources({
+          type: 'upload',
+          prefix: folder,  // Just use the folder as-is
+          max_results: 100,
+          context: true
+        });
+      } catch (cloudinaryError) {
+        console.log('Cloudinary API error, using mock data:', cloudinaryError.message);
+        const mockImages = getMockImages(folder);
+        cache.set(cacheKey, { data: mockImages, timestamp: Date.now() });
+        return res.status(200).json(mockImages);
+      }
+
+      const images = result.resources || [];
+      
+      // If Cloudinary returns 0 images, use mock data instead
+      if (images.length === 0) {
+        console.log('Cloudinary returned 0 images for', folder, 'using mock data');
+        const mockImages = getMockImages(folder);
+        cache.set(cacheKey, { data: mockImages, timestamp: Date.now() });
+        return res.status(200).json(mockImages);
+      }
+
+      console.log(`✅ Fetched ${images.length} real images from Cloudinary for ${folder}`);
+      cache.set(cacheKey, { data: images, timestamp: Date.now() });
+      return res.status(200).json(images);
+      
+    } catch (error) {
+      console.error('API Error:', error.message);
+      const mockImages = getMockImages(folder);
+      cache.set(cacheKey, { data: mockImages, timestamp: Date.now() });
+      return res.status(200).json(mockImages);
+    }
+  } else {
+    res.status(405).json({ error: 'Method not allowed' });
+  }
+}
+
+function getMockImages(folder) {
+  const galleries = {
+    gallery: [
+      { secure_url: 'https://images.unsplash.com/photo-1501854140801-50d01698950b?w=600&h=400&fit=crop&q=80', public_id: 'nature_1' },
+      { secure_url: 'https://images.unsplash.com/photo-1449824913935-59a10b8d2000?w=600&h=400&fit=crop&q=80', public_id: 'urban_1' },
+      { secure_url: 'https://images.unsplash.com/photo-1550684376-efcbd6e3f031?w=600&h=400&fit=crop&q=80', public_id: 'abstract_1' },
+      { secure_url: 'https://images.unsplash.com/photo-1500462918059-b1a0cb512f1d?w=600&h=400&fit=crop&q=80', public_id: 'portrait_1' },
+    ],
+    'gallery/uploads': [
+      { secure_url: 'https://images.unsplash.com/photo-1579546929662-711aa81148cf?w=600&h=400&fit=crop&q=80', public_id: 'upload_1' },
+      { secure_url: 'https://images.unsplash.com/photo-1541701494587-cb58502866ab?w=600&h=400&fit=crop&q=80', public_id: 'upload_2' },
+    ],
+    'gallery/nature': [
+      { secure_url: 'https://images.unsplash.com/photo-1501854140801-50d01698950b?w=600&h=400&fit=crop&q=80', public_id: 'nature_1' },
+      { secure_url: 'https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=600&h=400&fit=crop&q=80', public_id: 'nature_2' },
+    ],
+    'gallery/portraits': [
+      { secure_url: 'https://images.unsplash.com/photo-1500462918059-b1a0cb512f1d?w=600&h=400&fit=crop&q=80', public_id: 'portrait_1' },
+      { secure_url: 'https://images.unsplash.com/photo-1493246507139-91e8fad9978e?w=600&h=400&fit=crop&q=80', public_id: 'portrait_2' },
+    ]
+  };
+  
+  return galleries[folder] || galleries.gallery;
+}
