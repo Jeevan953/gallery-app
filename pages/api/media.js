@@ -1,4 +1,7 @@
+// pages/api/media.js
 import { v2 as cloudinary } from 'cloudinary';
+import fs from 'fs';
+import path from 'path';
 
 const cache = new Map();
 const CACHE_DURATION = 30000;
@@ -21,7 +24,15 @@ export default async function handler(req, res) {
         }
       }
 
-      // Get credentials
+      // SPECIAL CASE: For Psalm 1, return local images
+      if (folder === 'psalm1' || folder === 'Psalm 1') {
+        console.log('Loading local Psalm 1 images');
+        const localImages = getLocalPsalm1Images(type);
+        cache.set(cacheKey, { data: localImages, timestamp: Date.now() });
+        return res.status(200).json(localImages);
+      }
+
+      // Get credentials for Cloudinary
       const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
       const apiKey = process.env.NEXT_PUBLIC_CLOUDINARY_API_KEY;
       const apiSecret = process.env.CLOUDINARY_API_SECRET;
@@ -109,6 +120,32 @@ export default async function handler(req, res) {
   } else {
     res.status(405).json({ error: 'Method not allowed' });
   }
+}
+
+// Function to get local Psalm 1 images
+function getLocalPsalm1Images(type) {
+  const images = [];
+  
+  // Only return images (no videos in Psalm 1)
+  if (type === 'all' || type === 'image') {
+    // Create 7 image objects for psalm1_1.png through psalm1_7.png
+    for (let i = 1; i <= 7; i++) {
+      images.push({
+        secure_url: `/Psalm 1/psalm1_${i}.png`,
+        public_id: `psalm1_${i}`,
+        resource_type: 'image',
+        format: 'png',
+        bytes: 300000,
+        created_at: new Date().toISOString(),
+        width: 600,
+        height: 400,
+        folder: 'psalm1'
+      });
+    }
+  }
+  
+  // Return empty array for video type
+  return images;
 }
 
 function getMockMedia(folder, type) {

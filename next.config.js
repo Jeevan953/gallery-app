@@ -22,10 +22,6 @@ const nextConfig = {
     // Disable image optimization in dev for speed
     unoptimized: process.env.NODE_ENV === 'development',
   },
-  // Enable or disable features based on environment
-  ...(process.env.NODE_ENV === 'production' && {
-    swcMinify: true,
-  }),
 }
 
 module.exports = nextConfig
