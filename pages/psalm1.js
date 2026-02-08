@@ -30,4 +30,4 @@ export default function Psalm1() {
       </div>
     </div>
   );
-}
+} 
