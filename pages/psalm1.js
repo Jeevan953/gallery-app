@@ -31,3 +31,4 @@ export default function Psalm1() {
     </div>
   );
 } 
+console.log('Deployment trigger');
