@@ -7,6 +7,8 @@ export default function Psalm1() {
     `/Psalm 1/psalm1_${i + 1}.png`
   );
 
+  console.log('Deployment trigger'); // This is now INSIDE the function
+
   return (
     <div>
       <Head>
@@ -30,5 +32,4 @@ export default function Psalm1() {
       </div>
     </div>
   );
-} 
-console.log('Deployment trigger');
+}
